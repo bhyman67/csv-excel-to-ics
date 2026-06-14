@@ -1,2 +1,5 @@
 *.ics
 *.xlsx
+*.csv
+*.lnk
+tmp/

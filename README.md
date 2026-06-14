@@ -1,51 +1,130 @@
-# Meetup and Networking Calendar Merger
+# Excel/CSV to Outlook ICS Utility
 
-A Python utility for merging meetup events from an Excel workbook with existing ICS calendar files.
+A generic Python utility for converting event rows from Excel or CSV files into Outlook-friendly `.ics` calendar files.
 
-## Description
+## What It Does
 
-This tool reads events from an Excel spreadsheet and merges them with an existing ICS calendar file, creating a combined calendar that can be imported into calendar applications like Google Calendar, Outlook, or Apple Calendar.
+The script reads tabular data and creates a new ICS calendar file designed for reliable Outlook import.
 
-## Features
+It supports:
 
-- Merges events from Excel workbook into ICS calendar format
-- Supports event exclusion rules to filter out unwanted events
-- Avoids duplicate event entries
-- Generates standard iCalendar (.ics) format output
+- CSV, XLSX, and XLS input files
+- Auto-detecting common event column names
+- Explicit column mapping via CLI flags
+- Optional merge with an existing ICS file
+- Timed and all-day events
+- Outlook-oriented ICS fields (`METHOD:PUBLISH`, Microsoft busy status properties, CRLF line endings)
 
-## Files
+## Expected Data Columns
 
-- `meetup_calendar_merger.py` - Main Python script for merging calendars
-- `Attending & Attended Meetups.ics` - Source ICS calendar file (ignored by git)
-- `Merged_Meetups_and_Networking.ics` - Output merged calendar file (ignored by git)
-- `.gitignore` - Excludes ICS and XLSX files from version control
+Required:
+
+- Title/subject column (examples: `title`, `subject`, `summary`, `event`)
+- Start date/time column (examples: `start`, `start date`, `start datetime`)
+
+Optional:
+
+- End date/time (`end`, `finish`)
+- Description (`description`, `notes`, `details`)
+- Location (`location`, `venue`, `address`)
+- All-day indicator (`all day`, `all_day`)
+- Categories (`category`, `tags`)
+
+If `end` is missing, duration defaults to 60 minutes (configurable).
+
+## Installation
+
+```bash
+pip install -r requirements.txt
+```
+
+## Recommended Folders
+
+- `input/` for source `.csv`, `.xlsx`, and existing `.ics` files
+- `output/` for generated `.ics` files
 
 ## Usage
 
-Run the script to merge your meetup events:
+Basic:
 
 ```bash
-python meetup_calendar_merger.py
+python excel_csv_to_outlook_ics.py --input input/events.xlsx --output output/events.ics
 ```
 
-The script expects:
-- An Excel file named `Meetups and Networking.xlsx` with event data
-- An existing ICS file named `Attending & Attended Meetups.ics` (optional)
-
-Output will be generated as `Merged_Meetups_and_Networking.ics`.
-
-## Requirements
-
-- Python 3.x
-- pandas
-- openpyxl (for Excel file support)
-
-Install dependencies:
+CSV input:
 
 ```bash
-pip install pandas openpyxl
+python excel_csv_to_outlook_ics.py --input input/events.csv --output output/events.ics
 ```
 
-## License
+Specify column mappings explicitly:
 
-Personal project for managing meetup calendars.
+```bash
+python excel_csv_to_outlook_ics.py \
+	--input input/events.xlsx \
+	--output output/events.ics \
+	--title-column "Event Name" \
+	--start-column "Start Date" \
+	--end-column "End Date" \
+	--description-column "Notes" \
+	--location-column "Venue"
+```
+
+Set timezone/default duration/calendar name:
+
+```bash
+python excel_csv_to_outlook_ics.py \
+	--input input/events.xlsx \
+	--output output/events.ics \
+	--timezone "America/Denver" \
+	--default-duration-minutes 90 \
+	--calendar-name "Work Events"
+```
+
+Merge into an existing ICS file:
+
+```bash
+python excel_csv_to_outlook_ics.py \
+	--input input/events.xlsx \
+	--existing-ics input/current_calendar.ics \
+	--output output/merged_calendar.ics
+```
+
+Merge with timezone and custom calendar name:
+
+```bash
+python excel_csv_to_outlook_ics.py \
+	--input input/events.xlsx \
+	--existing-ics input/current_calendar.ics \
+	--output output/merged_calendar.ics \
+	--timezone "America/Denver" \
+	--calendar-name "Merged Work Events"
+```
+
+When `--existing-ics` is used, existing events are carried forward and duplicate new events are skipped using `summary + DTSTART` matching.
+
+## CLI Options
+
+- `--input` **Required** path to `.csv`, `.xlsx`, or `.xls`
+- `--output` **Required** output `.ics` path
+- `--existing-ics` Existing `.ics` file to merge with generated events
+- `--sheet` Excel sheet name or index
+- `--csv-delimiter` CSV delimiter (default `,`)
+- `--title-column` Explicit title column
+- `--start-column` Explicit start datetime column
+- `--end-column` Explicit end datetime column
+- `--description-column` Explicit description column
+- `--location-column` Explicit location column
+- `--all-day-column` Explicit all-day flag column
+- `--categories-column` Explicit categories column
+- `--timezone` Timezone used for naive datetimes
+- `--default-duration-minutes` Fallback event duration
+- `--calendar-name` Calendar display name in Outlook
+- `--uid-domain` Domain suffix for generated event UIDs
+
+## Outlook Import Notes
+
+- Timed events are exported as UTC timestamps (`...Z`), which Outlook handles consistently.
+- All-day events use `VALUE=DATE` with an exclusive `DTEND`, which is the expected iCalendar pattern.
+- Output uses CRLF line endings for better Outlook compatibility.
+
