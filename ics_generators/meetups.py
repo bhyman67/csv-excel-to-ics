@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Generic CSV/Excel to Outlook-friendly ICS converter."""
+"""Generate an ICS calendar file from a Meetup events CSV or Excel export.
+
+Usage:
+    python generators/meetups.py --input input/meetups/events.csv --output output/meetups.ics
+    python generators/meetups.py --input input/meetups/events.xlsx --output output/meetups.ics --existing-ics output/meetups.ics
+
+Supports CSV, XLSX, and XLS input. Column names are auto-detected from common
+aliases; use explicit flags to override when needed.
+"""
 
 from __future__ import annotations
 
@@ -238,16 +246,15 @@ def normalize_block_line_endings(block: str) -> str:
 def build_calendar_text(calendar_name: str, event_blocks: list[str]) -> str:
     header = [
         "BEGIN:VCALENDAR",
-        "PRODID:-//Excel CSV to ICS//Outlook Calendar Utility//EN",
+        "PRODID:-//Meetups ICS Generator//EN",
         "VERSION:2.0",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
-        f"X-WR-CALNAME:{escape_ics_text(calendar_name) or 'Imported Calendar'}",
+        f"X-WR-CALNAME:{escape_ics_text(calendar_name) or 'Meetups'}",
         "X-WR-TIMEZONE:UTC",
     ]
 
-    all_lines: list[str] = header
-    folded_header = [fold_ics_line(line) for line in all_lines]
+    folded_header = [fold_ics_line(line) for line in header]
     body = "\r\n".join(folded_header)
     if event_blocks:
         body += "\r\n" + "\r\n".join(event_blocks)
@@ -257,11 +264,11 @@ def build_calendar_text(calendar_name: str, event_blocks: list[str]) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Convert Excel or CSV event data into an Outlook-friendly ICS file."
+        description="Convert a Meetup events CSV or Excel file into an Outlook-friendly ICS file."
     )
     parser.add_argument("--input", required=True, help="Path to input .csv/.xlsx/.xls file")
     parser.add_argument("--output", required=True, help="Path to output .ics file")
-    parser.add_argument("--existing-ics", help="Path to existing .ics file to merge into output")
+    parser.add_argument("--existing-ics", help="Path to an existing .ics file to merge into output")
     parser.add_argument("--sheet", help="Excel sheet name or index (Excel inputs only)")
     parser.add_argument("--csv-delimiter", default=",", help="CSV delimiter (default: ,)")
 
@@ -276,22 +283,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--timezone",
         default="America/Denver",
-        help="Timezone for naive datetime values in the source data",
+        help="Timezone for naive datetime values in the source data (default: America/Denver)",
     )
     parser.add_argument(
         "--default-duration-minutes",
         type=int,
         default=60,
-        help="Default duration when end time is missing (default: 60)",
+        help="Default event duration when end time is missing (default: 60)",
     )
     parser.add_argument(
         "--calendar-name",
-        default="Imported Calendar",
-        help="Calendar name visible in Outlook",
+        default="Meetups",
+        help="Calendar name visible in Outlook (default: Meetups)",
     )
     parser.add_argument(
         "--uid-domain",
-        default="excel-csv-import.local",
+        default="meetups-ics.local",
         help="Domain used for generated event UIDs",
     )
     return parser.parse_args()
@@ -378,12 +385,12 @@ def main() -> None:
     with open(output_path, "w", encoding="utf-8", newline="") as handle:
         handle.write(calendar_text)
 
-    print(f"Input rows: {len(df)}")
-    print(f"Existing events merged: {len(existing_blocks)}")
-    print(f"New events created: {len(new_event_blocks)}")
-    print(f"Duplicates skipped: {duplicates}")
-    print(f"Rows skipped (missing/invalid start date): {skipped}")
-    print(f"Wrote Outlook-friendly ICS file: {output_path}")
+    print(f"Input rows              : {len(df)}")
+    print(f"Existing events merged  : {len(existing_blocks)}")
+    print(f"New events created      : {len(new_event_blocks)}")
+    print(f"Duplicates skipped      : {duplicates}")
+    print(f"Rows skipped (bad start): {skipped}")
+    print(f"ICS written to          : {output_path}")
 
 
 if __name__ == "__main__":

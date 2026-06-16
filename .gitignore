@@ -2,4 +2,5 @@
 *.xlsx
 *.csv
 *.lnk
+*.html
 tmp/
