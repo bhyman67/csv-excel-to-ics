@@ -21,6 +21,8 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from path_config import resolve_input_path, resolve_output_path
+
 
 COLUMN_ALIASES = {
     "title": [
@@ -266,9 +268,29 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Convert a Meetup events CSV or Excel file into an Outlook-friendly ICS file."
     )
-    parser.add_argument("--input", required=True, help="Path to input .csv/.xlsx/.xls file")
-    parser.add_argument("--output", required=True, help="Path to output .ics file")
-    parser.add_argument("--existing-ics", help="Path to an existing .ics file to merge into output")
+    parser.add_argument(
+        "--input",
+        required=True,
+        help=(
+            "Path to input .csv/.xlsx/.xls file. "
+            "Absolute paths are used as-is; relative paths are resolved under the configured input root."
+        ),
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help=(
+            "Path to output .ics file (default: meetups.ics under the configured output root). "
+            "Absolute paths are used as-is; relative paths are resolved under the configured output root."
+        ),
+    )
+    parser.add_argument(
+        "--existing-ics",
+        help=(
+            "Path to an existing .ics file to merge into output. "
+            "Absolute paths are used as-is; relative paths are resolved under the configured output root."
+        ),
+    )
     parser.add_argument("--sheet", help="Excel sheet name or index (Excel inputs only)")
     parser.add_argument("--csv-delimiter", default=",", help="CSV delimiter (default: ,)")
 
@@ -314,8 +336,8 @@ def parse_sheet_arg(sheet_arg: str | None) -> str | int | None:
 
 def main() -> None:
     args = parse_args()
-    input_path = Path(args.input)
-    output_path = Path(args.output)
+    input_path = resolve_input_path(args.input)
+    output_path = resolve_output_path(args.output, "meetups.ics")
 
     if not input_path.exists():
         raise FileNotFoundError(f"Input file not found: {input_path}")
@@ -343,7 +365,7 @@ def main() -> None:
     existing_blocks: list[str] = []
     existing_keys: set[tuple[str, str]] = set()
     if args.existing_ics:
-        existing_path = Path(args.existing_ics)
+        existing_path = resolve_output_path(args.existing_ics)
         if not existing_path.exists():
             raise FileNotFoundError(f"Existing ICS file not found: {existing_path}")
         with open(existing_path, "r", encoding="utf-8", errors="replace") as handle:

@@ -3,7 +3,7 @@
 
 Usage:
     python generators/cpy_classes.py
-    python generators/cpy_classes.py input/cpy/CPY\ Class\ History.html output/cpy_classes.ics
+    python generators/cpy_classes.py input/cpy_class_hist/CPY\ Class\ History.html output/cpy_classes.ics
 
 The HTML file is the "Class History" page saved from the CorePower Yoga website.
 """
@@ -16,6 +16,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
+
+from path_config import resolve_input_path, resolve_output_path
 
 CARD_SPLIT_TOKEN = '<div class="d-flex flex-column p-3 py-md-4 px-sm-4 mt-3 border rounded-lg">'
 
@@ -222,19 +224,25 @@ def main() -> None:
     parser.add_argument(
         "input_html",
         nargs="?",
-        default="input/cpy/CPY Class History.html",
-        help='Path to the saved class history HTML file (default: "input/cpy/CPY Class History.html")',
+        default=None,
+        help=(
+            "Path to the saved class history HTML file. "
+            "Absolute paths are used as-is; relative paths are resolved under the configured input root."
+        ),
     )
     parser.add_argument(
         "output_ics",
         nargs="?",
-        default="output/cpy_classes.ics",
-        help='Path for the output ICS file (default: "output/cpy_classes.ics")',
+        default=None,
+        help=(
+            "Path for the output ICS file. "
+            "Absolute paths are used as-is; relative paths are resolved under the configured output root."
+        ),
     )
     args = parser.parse_args()
 
-    input_path = Path(args.input_html)
-    output_path = Path(args.output_ics)
+    input_path = resolve_input_path(args.input_html, "cpy_class_hist/CPY Class History.html")
+    output_path = resolve_output_path(args.output_ics, "cpy_classes.ics")
 
     if not input_path.exists():
         raise SystemExit(f"Input file not found: {input_path}")

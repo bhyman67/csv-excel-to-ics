@@ -1,4 +1,4 @@
-# personal-ics-generators
+# Personal ICS Calendar Generators
 
 A collection of Python scripts that generate Outlook-importable `.ics` calendar files from various personal data sources.
 
@@ -6,9 +6,65 @@ Each generator lives in `generators/` and is a self-contained script with its ow
 
 ## Setup
 
-```bash
+Use the steps below to recreate the environment on a new machine.
+
+Minimum Python version: 3.14
+
+Create and activate a virtual environment in the repo root, then install pinned dependencies:
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+macOS/Linux:
+
+```bash
+python3.14 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+## Path Configuration (OneDrive Friendly)
+
+The scripts can resolve paths from configurable input/output roots so each computer can use its own OneDrive location.
+
+Path resolution rules:
+
+1. Absolute paths are used exactly as provided.
+2. Relative input paths are resolved under the configured input root.
+3. Relative output paths are resolved under the configured output root.
+
+### Option A: Local config file (recommended)
+
+Copy `paths.local.example.json` to `paths.local.json` and update values for your machine.
+
+Example:
+
+```json
+{
+    "input_root": "C:/Users/<you>/OneDrive/Documents/personal-ics/input",
+    "output_root": "C:/Users/<you>/OneDrive/Documents/personal-ics/output"
+}
+```
+
+`paths.local.json` is ignored by git, so each machine can keep its own paths.
+
+### Option B: Environment variables
+
+Set either or both of these:
+
+- `ICS_INPUT_ROOT`
+- `ICS_OUTPUT_ROOT`
+
+Optional override for config-file location:
+
+- `ICS_PATHS_CONFIG` (path to a JSON config file)
 
 ## Generators
 
@@ -16,13 +72,13 @@ pip install -r requirements.txt
 
 Parses the "Class History" page saved from the CorePower Yoga website and produces a calendar of past/upcoming classes.
 
-**Input:** Save the Class History page as HTML from your browser, place it in `input/cpy/`.
+**Input:** Save the Class History page as HTML from your browser, place it in `input/cpy_class_hist/`.
 
 ```bash
 python ics_generators/cpy_classes.py
-# defaults to: input/cpy/CPY Class History.html → output/cpy_classes.ics
+# defaults to: <input_root>/cpy_class_hist/CPY Class History.html -> <output_root>/cpy_classes.ics
 
-python ics_generators/cpy_classes.py "input/cpy/CPY Class History.html" output/cpy_classes.ics
+python ics_generators/cpy_classes.py "input/cpy_class_hist/CPY Class History.html" output/cpy_classes.ics
 ```
 
 ---
@@ -36,23 +92,25 @@ Converts a Meetup events CSV or Excel export into a calendar. Column names are a
 ```bash
 python ics_generators/meetups.py \
     --input "input/meetups/Data & Automation Career + BytePeak Engineering.CSV" \
-    --output output/meetups.ics
+    --output meetups.ics
 
 # Merge new events into an existing ICS (deduplicates by title + start time):
 python ics_generators/meetups.py \
     --input "input/meetups/events.csv" \
-    --output output/meetups.ics \
-    --existing-ics output/meetups.ics
+    --output meetups.ics \
+    --existing-ics meetups.ics
 
 # Override column names and timezone:
 python ics_generators/meetups.py \
     --input "input/meetups/events.csv" \
-    --output output/meetups.ics \
+    --output meetups.ics \
     --title-column "Event Name" \
     --start-column "Start Date" \
     --end-column "End Date" \
     --timezone "America/Denver"
 ```
+
+If `--output` is omitted, Meetups defaults to `<output_root>/meetups.ics`.
 
 **All flags:**
 
@@ -75,12 +133,21 @@ python ics_generators/meetups.py \
 ## Folder Layout
 
 ```
-ics_generators/     # one script per ICS generator
+ics_generators/           # one script per ICS generator
+    cpy_classes.py          # CorePower Yoga HTML -> ICS
+    meetups.py              # Meetup CSV/Excel -> ICS
+    path_config.py          # shared input/output root resolution
+requirements.txt          # pinned Python dependencies
+paths.local.example.json  # copy to paths.local.json on each machine
+paths.local.json          # local machine paths (git-ignored)
+
+# Under your configured input root (in OneDrive):
 input/
-  cpy/              # CorePower Yoga HTML exports
-  meetups/          # Meetup CSV/Excel exports
-output/             # generated .ics files (import these into Outlook)
-Old Data/           # archived ICS files
+    cpy_class_hist/         # CorePower Yoga HTML exports
+    meetups/                # Meetup CSV/Excel exports
+
+# Under your configured output root (in OneDrive):
+output/                   # generated .ics files (import into Outlook)
 ```
 
 ## Adding a New Generator

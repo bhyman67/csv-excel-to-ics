@@ -3,4 +3,9 @@
 *.csv
 *.lnk
 *.html
-tmp/
+.venv/
+paths.local.json
+
+# Python cache / bytecode
+__pycache__/
+*.py[cod]
