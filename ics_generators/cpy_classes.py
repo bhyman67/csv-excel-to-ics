@@ -38,6 +38,7 @@ TZ_OFFSETS = {
 
 
 def _first_group(pattern: str, text: str, flags: int = 0) -> Optional[str]:
+    # Convenience helper for one-off regex extractions from each card block.
     match = re.search(pattern, text, flags)
     if not match:
         return None
@@ -49,6 +50,8 @@ def _parse_date(date_text: str) -> datetime.date:
 
 
 def _parse_clock(time_text: str) -> datetime.time:
+    # Normalize spacing/casing first so a single parser can handle variations
+    # like "9am", "9 AM", and "9:00 pm" after extraction.
     normalized = re.sub(r"\s+", " ", time_text.strip()).upper()
     for fmt in ("%I:%M %p", "%I %p"):
         try:
@@ -59,6 +62,7 @@ def _parse_clock(time_text: str) -> datetime.time:
 
 
 def _ical_escape(value: str) -> str:
+    # Escape characters that have special meaning in iCalendar text fields.
     return (
         value.replace("\\", "\\\\")
         .replace(";", "\\;")
@@ -69,6 +73,8 @@ def _ical_escape(value: str) -> str:
 
 
 def _fold_ical_line(line: str, limit: int = 75) -> list[str]:
+    # RFC 5545 recommends folding long content lines at 75 octets.
+    # We fold by UTF-8 bytes (not characters) to keep multibyte text valid.
     encoded = line.encode("utf-8")
     if len(encoded) <= limit:
         return [line]
@@ -78,6 +84,7 @@ def _fold_ical_line(line: str, limit: int = 75) -> list[str]:
     for ch in line:
         ch_bytes = ch.encode("utf-8")
         if len(current) + len(ch_bytes) > limit:
+            # Continuation lines must start with a single space.
             chunks.append(current.decode("utf-8"))
             current = b" " + ch_bytes
         else:
@@ -90,6 +97,8 @@ def _fold_ical_line(line: str, limit: int = 75) -> list[str]:
 def _to_utc_or_floating(local_dt: datetime, tz_abbrev: str) -> tuple[str, str]:
     offset = TZ_OFFSETS.get(tz_abbrev.upper()) if tz_abbrev else None
     if offset is None:
+        # If timezone is unknown, keep a floating local datetime so clients
+        # interpret it in the viewer's local timezone.
         return ("LOCAL", local_dt.strftime("%Y%m%dT%H%M%S"))
 
     local_tz = timezone(timedelta(hours=offset))
@@ -98,6 +107,7 @@ def _to_utc_or_floating(local_dt: datetime, tz_abbrev: str) -> tuple[str, str]:
 
 
 def _build_event(block: str, idx: int, now_utc: str) -> Optional[list[str]]:
+    # Pull the fields we need from one "class card" block.
     date_text = _first_group(r"letter-spacing-1\">([^<]+)</div>", block)
     time_text = _first_group(r"session-card_sessionTime__[^\"]*\">([^<]+)</div>", block)
     tz_abbrev = _first_group(r"session-card_sessionTimeZone__[^\"]*\">([^<]+)</div>", block) or ""
@@ -108,6 +118,7 @@ def _build_event(block: str, idx: int, now_utc: str) -> Optional[list[str]]:
     if not date_text or not time_text:
         return None
 
+    # Expected format is "start - end" (e.g., "9:00 AM - 10:00 AM").
     time_parts = [p.strip() for p in time_text.split("-")]
     if len(time_parts) != 2:
         return None
@@ -119,6 +130,7 @@ def _build_event(block: str, idx: int, now_utc: str) -> Optional[list[str]]:
     start_local = datetime.combine(class_date, start_time)
     end_local = datetime.combine(class_date, end_time)
     if end_local <= start_local:
+        # Handle classes that pass midnight.
         end_local += timedelta(days=1)
 
     _, dtstart = _to_utc_or_floating(start_local, tz_abbrev)
@@ -146,6 +158,7 @@ def _build_event(block: str, idx: int, now_utc: str) -> Optional[list[str]]:
         lines.append(f"DTSTART:{dtstart}")
         lines.append(f"DTEND:{dtend}")
     else:
+        # Floating local datetimes (without trailing Z).
         lines.append(f"DTSTART:{dtstart}")
         lines.append(f"DTEND:{dtend}")
 
@@ -164,6 +177,7 @@ def _build_event(block: str, idx: int, now_utc: str) -> Optional[list[str]]:
 
 def export_html_to_ics(input_path: Path, output_path: Path) -> tuple[int, int]:
     raw = input_path.read_text(encoding="utf-8")
+    # The page has repeated card containers; split once, then parse each card.
     blocks = raw.split(CARD_SPLIT_TOKEN)
 
     now_utc = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -171,6 +185,7 @@ def export_html_to_ics(input_path: Path, output_path: Path) -> tuple[int, int]:
 
     for idx, block in enumerate(blocks[1:], start=1):
         try:
+            # Parsing is intentionally resilient: skip malformed cards and keep going.
             event_lines = _build_event(block, idx, now_utc)
         except ValueError:
             event_lines = None
